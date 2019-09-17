@@ -8,14 +8,29 @@ import logging
 class StageToRedshiftOperator(BaseOperator):
     ui_color = '#358140'
     template_fields = ("s3_key",)
-    copy_sql = """
+    #copy command for songs data from s3 to redshift
+    
+    copy_songs_json = """
         COPY {}
         FROM '{}'
         ACCESS_KEY_ID '{}'
         SECRET_ACCESS_KEY '{}'
-        REGION '{}'
-        IGNOREHEADER {}
-        JSON '{}'
+        TIMEFORMAT AS 'epochmillisecs'
+        REGION 'us-west-2'
+        COMPUPDATE OFF 
+        FORMAT AS JSON 'auto'
+    """
+    
+    copy_events_json = """ 
+        COPY {}
+        FROM '{}'
+        ACCESS_KEY_ID '{}'
+        SECRET_ACCESS_KEY '{}'
+        TIMEFORMAT AS 'epochmillisecs'
+        TRUNCATECOLUMNS BLANKSASNULL EMPTYASNULL
+        REGION 'us-west-2'
+        COMPUPDATE OFF 
+        FORMAT AS JSON 's3://udacity-dend/log_json_path.json'
     """
     
     @apply_defaults
@@ -28,9 +43,6 @@ class StageToRedshiftOperator(BaseOperator):
                  s3_bucket = '',
                  s3_key = '',
                  region = '',
-                 JSON = 'auto',
-                 delimiter = ',',
-                 ignore_headers = 1,
                  *args, **kwargs):
 
         super(StageToRedshiftOperator, self).__init__(*args, **kwargs)
@@ -41,10 +53,7 @@ class StageToRedshiftOperator(BaseOperator):
         self.create_sql_table = create_sql_table
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
-        self.JSON = JSON
         self.region = region
-        self.delimiter = delimiter
-        self.ignore_headers = ignore_headers
 
     def execute(self, context):
         self.log.info('Connecting to AWS and Redshift VIA creds')
@@ -55,20 +64,24 @@ class StageToRedshiftOperator(BaseOperator):
         self.log.info("Copying data from S3 to Redshift")
         rendered_key = self.s3_key.format(**context)
         s3_path = "s3://{}/{}".format(self.s3_bucket, rendered_key)
-        formatted_sql = StageToRedshiftOperator.copy_sql.format(
-            self.table,
-            s3_path,
-            credentials.access_key,
-            credentials.secret_key,
-            self.region,
-            self.ignore_headers,
-            self.JSON
-        )
+
+        if self.table == 'staging_songs':
+            formatted_sql = StageToRedshiftOperator.copy_songs_json.format(
+                self.table,
+                s3_path,
+                credentials.access_key,
+                credentials.secret_key
+            )
+            self.log.info(formatted_sql)
+            
+        else:
+            formatted_sql = StageToRedshiftOperator.copy_events_json.format(
+                self.table,
+                s3_path,
+                credentials.access_key,
+                credentials.secret_key
+            )
+
         redshift.run(formatted_sql)
         self.log.info('Loaded into staging table properly! ')
-        
-
-
-
-
-
+       
