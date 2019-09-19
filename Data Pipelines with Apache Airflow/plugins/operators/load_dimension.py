@@ -6,12 +6,6 @@ class LoadDimensionOperator(BaseOperator):
 
     ui_color = '#80BD9E'
     
-    #keeping this here for now until project is completed.
-#     dimension_query = """ 
-#         INSERT INTO {table}
-#         {select_query}
-#     """
-    
     @apply_defaults
     def __init__(self,
                  redshift_conn_id,
@@ -40,12 +34,6 @@ class LoadDimensionOperator(BaseOperator):
 
             sql_statement = 'INSERT INTO %s %s' % (self.table_name, self.select_query)
             redshift.run(sql_statement)
-        
-        #keeping this bit here for now until projected is officially completed. 
-#         redshift.run(LoadDimensionOperator.dimension_query.format(
-#             table=self.table,
-#             select_query=self.select_query
-#         ))
         
         self.log.info(f'finished uploading {self.table} table!')
         
